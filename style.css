@@ -1,0 +1,540 @@
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x7ec8ff);
+scene.fog = new THREE.Fog(0x7ec8ff, 16, 90);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300);
+camera.rotation.order = 'YXZ';
+
+const ambient = new THREE.HemisphereLight(0xdff1ff, 0x5b4a38, 1.15);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff6c7, 1.2);
+sun.position.set(11, 20, 10);
+scene.add(sun);
+
+const worldGroup = new THREE.Group();
+scene.add(worldGroup);
+
+const ground = new THREE.Mesh(
+  new THREE.BoxGeometry(80, 2, 80),
+  new THREE.MeshStandardMaterial({ color: 0x71d06a, roughness: 0.9 })
+);
+ground.position.y = -1;
+worldGroup.add(ground);
+
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(120, 32, 32),
+  new THREE.MeshBasicMaterial({ color: 0xbfe8ff, side: THREE.BackSide })
+);
+scene.add(sky);
+
+const solidBoxes = [];
+const decorativeBlocks = [];
+
+function addBlock(x, y, z, w, h, d, color = 0x4d8ef7) {
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.8,
+      metalness: 0.1
+    })
+  );
+  mesh.position.set(x, y, z);
+  worldGroup.add(mesh);
+  solidBoxes.push({
+    minX: x - w / 2,
+    maxX: x + w / 2,
+    minY: y - h / 2,
+    maxY: y + h / 2,
+    minZ: z - d / 2,
+    maxZ: z + d / 2,
+  });
+  decorativeBlocks.push(mesh);
+}
+
+function addPlatform(x, y, z, w, h, d, color = 0x7e5af5) {
+  addBlock(x, y, z, w, h, d, color);
+}
+
+function addTree(x, z) {
+  const trunk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.4, 0.55, 2.5, 8),
+    new THREE.MeshStandardMaterial({ color: 0x7b4d1b })
+  );
+  trunk.position.set(x, 1.25, z);
+  worldGroup.add(trunk);
+
+  const leaves = new THREE.Mesh(
+    new THREE.SphereGeometry(1.5, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3cbf58 })
+  );
+  leaves.position.set(x, 3.2, z);
+  worldGroup.add(leaves);
+}
+
+const spawnPosition = new THREE.Vector3(0, 2.1, 10);
+const player = {
+  position: spawnPosition.clone(),
+  velocity: new THREE.Vector3(),
+  height: 1.8,
+  radius: 0.45,
+  onGround: false
+};
+
+const controls = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false,
+  jump: false,
+  pointerLocked: false
+};
+
+const yaw = { value: 0 };
+const pitch = { value: 0 };
+
+const scoreEl = document.getElementById('score');
+const gemsEl = document.getElementById('gems');
+const messageEl = document.getElementById('message');
+
+let score = 0;
+let gems = 0;
+
+addBlock(-16, 1.3, 0, 7, 2.6, 7, 0x3b82f6);
+addBlock(10, 1.3, -12, 6, 2.6, 6, 0xf59e0b);
+addBlock(14, 3.4, 6, 8, 2.8, 5, 0x10b981);
+addBlock(-8, 3.1, 13, 8, 2.2, 4, 0xf43f5e);
+addBlock(0, 5.2, 0, 11, 2.2, 6, 0x8b5cf6);
+addBlock(-17, 7.5, -14, 9, 2.2, 5, 0xeb4894);
+addBlock(18, 9, 10, 7, 2.2, 5, 0x14b8a6);
+
+addPlatform(-20, 2.2, -25, 4, 0.8, 4, 0x5eead4);
+addPlatform(-10, 4.5, -22, 4, 0.8, 4, 0x5eead4);
+addPlatform(0, 6.7, -18, 4, 0.8, 4, 0x5eead4);
+addPlatform(14, 8.9, -20, 4, 0.8, 4, 0x5eead4);
+
+for (let i = -30; i <= 30; i += 10) {
+  addTree(i, -30 + (i % 7) * 3);
+  addTree(-28 + (i % 5) * 4, 20 + (i % 9));
+}
+
+const gemMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffd857,
+  emissive: 0xffb703,
+  emissiveIntensity: 0.8,
+  metalness: 0.2,
+  roughness: 0.3
+});
+
+const gemsGroup = new THREE.Group();
+scene.add(gemsGroup);
+
+const gemPositions = [
+  new THREE.Vector3(-20, 4.8, -25),
+  new THREE.Vector3(-10, 7.1, -22),
+  new THREE.Vector3(0, 9.5, -18),
+  new THREE.Vector3(14, 12, -20),
+  new THREE.Vector3(18, 12.5, 10),
+  new THREE.Vector3(-8, 5, 13),
+  new THREE.Vector3(0, 8, 0),
+  new THREE.Vector3(10, 4, -12)
+];
+
+const gemMeshes = [];
+
+for (const pos of gemPositions) {
+  const mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.6, 0), gemMaterial);
+  mesh.position.copy(pos);
+  gemMeshes.push(mesh);
+  gemsGroup.add(mesh);
+}
+
+function updateHud() {
+  scoreEl.textContent = score;
+  gemsEl.textContent = gems;
+}
+
+function resetPlayer() {
+  player.position.copy(spawnPosition);
+  player.velocity.set(0, 0, 0);
+  player.onGround = false;
+  camera.position.copy(player.position);
+  camera.position.y += 1.65;
+}
+
+function startPointerLock() {
+  renderer.domElement.requestPointerLock();
+}
+
+function setMessage(text) {
+  messageEl.textContent = text;
+}
+
+renderer.domElement.addEventListener('click', () => {
+  if (!controls.pointerLocked) {
+    startPointerLock();
+  }
+});
+
+document.addEventListener('pointerlockchange', () => {
+  controls.pointerLocked = document.pointerLockElement === renderer.domElement;
+  if (controls.pointerLocked) {
+    setMessage('WASD to move • Space to jump • Mouse to look');
+  } else {
+    setMessage('Click to start • WASD to move • Space to jump • Mouse to look');
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.code === 'KeyW') controls.forward = true;
+  if (event.code === 'KeyS') controls.backward = true;
+  if (event.code === 'KeyA') controls.left = true;
+  if (event.code === 'KeyD') controls.right = true;
+  if (event.code === 'Space') controls.jump = true;
+});
+
+document.addEventListener('keyup', (event) => {
+  if (event.code === 'KeyW') controls.forward = false;
+  if (event.code === 'KeyS') controls.backward = false;
+  if (event.code === 'KeyA') controls.left = false;
+  if (event.code === 'KeyD') controls.right = false;
+  if (event.code === 'Space') controls.jump = false;
+});
+
+document.addEventListener('mousemove', (event) => {
+  if (!controls.pointerLocked) return;
+  yaw.value -= event.movementX * 0.0025;
+  pitch.value -= event.movementY * 0.0021;
+  pitch.value = THREE.MathUtils.clamp(pitch.value, -1.5, 1.5);
+});
+
+function checkCollision(position) {
+  const halfHeight = player.height / 2;
+  const minX = position.x - player.radius;
+  const maxX = position.x + player.radius;
+  const minY = position.y - halfHeight;
+  const maxY = position.y + halfHeight;
+  const minZ = position.z - player.radius;
+  const maxZ = position.z + player.radius;
+
+  for (const box of solidBoxes) {
+    const intersects =
+      maxX > box.minX &&
+      minX < box.maxX &&
+      maxY > box.minY &&
+      minY < box.maxY &&
+      maxZ > box.minZ &&
+      minZ < box.maxZ;
+
+    if (intersects) return true;
+  }
+
+  return false;
+}
+
+function movePlayer(delta) {
+  const moveDir = new THREE.Vector3();
+
+  if (controls.forward) moveDir.z -= 1;
+  if (controls.backward) moveDir.z += 1;
+  if (controls.left) moveDir.x -= 1;
+  if (controls.right) moveDir.x += 1;
+
+  if (moveDir.lengthSq() > 0) {
+    moveDir.normalize();
+    const heading = new THREE.Vector3();
+    heading.x = Math.sin(yaw.value);
+    heading.z = Math.cos(yaw.value);
+    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), heading).normalize();
+    const desired = new THREE.Vector3();
+    desired.addScaledVector(heading, moveDir.z * -1);
+    desired.addScaledVector(right, moveDir.x);
+    desired.normalize().multiplyScalar(9.0);
+
+    player.velocity.x = THREE.MathUtils.lerp(player.velocity.x, desired.x, 0.18);
+    player.velocity.z = THREE.MathUtils.lerp(player.velocity.z, desired.z, 0.18);
+  } else {
+    player.velocity.x *= 0.82;
+    player.velocity.z *= 0.82;
+  }
+
+  const nextX = player.position.x + player.velocity.x * delta;
+  if (!checkCollision(new THREE.Vector3(nextX, player.position.y, player.position.z))) {
+    player.position.x = nextX;
+  } else {
+    player.velocity.x = 0;
+  }
+
+  const nextZ = player.position.z + player.velocity.z * delta;
+  if (!checkCollision(new THREE.Vector3(player.position.x, player.position.y, nextZ))) {
+    player.position.z = nextZ;
+  } else {
+    player.velocity.z = 0;
+  }
+
+  const gravity = 20;
+  player.velocity.y -= gravity * delta;
+  const nextY = player.position.y + player.velocity.y * delta;
+  const tempPos = player.position.clone();
+  tempPos.y = nextY;
+
+  if (!checkCollision(tempPos)) {
+    player.position.y = nextY;
+  } else {
+    if (player.velocity.y < 0) {
+      player.onGround = true;
+    }
+    player.velocity.y = 0;
+  }
+
+  if (player.position.y < -12) {
+    resetPlayer();
+  }
+
+  if (controls.jump && player.onGround) {
+    player.velocity.y = 8.8;
+    player.onGround = false;
+  }
+
+  if (player.position.y <= 1.2 && !checkCollision(new THREE.Vector3(player.position.x, 1.2, player.position.z))) {
+    player.position.y = 1.2;
+    player.velocity.y = 0;
+    player.onGround = true;
+  }
+}
+
+function collectGems() {
+  for (let i = gemMeshes.length - 1; i >= 0; i--) {
+    const gem = gemMeshes[i];
+    const dist = gem.position.distanceTo(player.position);
+    if (dist < 1.2) {
+      gemsGroup.remove(gem);
+      gemMeshes.splice(i, 1);
+      gems += 1;
+      score += 10;
+      updateHud();
+    }
+  }
+}
+
+function updateCamera() {
+  camera.position.set(player.position.x, player.position.y + 1.6, player.position.z);
+  camera.rotation.y = yaw.value;
+  camera.rotation.x = pitch.value;
+}
+
+function animateGems() {
+  for (const gem of gemMeshes) {
+    gem.rotation.y += 0.03;
+    gem.position.y += Math.sin(performance.now() * 0.0025 + gem.position.x) * 0.004;
+  }
+}
+
+let lastTime = 0;
+
+function animate(now) {
+  const delta = Math.min((now - lastTime) / 1000 || 0.016, 0.033);
+  lastTime = now;
+
+  movePlayer(delta);
+  collectGems();
+  animateGems();
+  updateCamera();
+
+  if (gems >= 8) {
+    setMessage('You won the Roblox-1o1 Sim! Press click to play again.');
+    score = Math.max(score, 80);
+    updateHud();
+  }
+
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+resetPlayer();
+updateHud();
+requestAnimationFrame(animate);
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+const caption = document.getElementById('message');
+caption.textContent = 'Click to start • WASD to move • Space to jump • Mouse to look';
+
+setMessage('Click to start • WASD to move • Space to jump • Mouse to look');
+
+console.log('Roblox-1o1-Sim loaded');
+
+window.addEventListener('blur', () => {
+  controls.forward = false;
+  controls.backward = false;
+  controls.left = false;
+  controls.right = false;
+  controls.jump = false;
+});
+
+window.addEventListener('keydown', (event) => {
+  if (event.code === 'KeyR') {
+    resetPlayer();
+  }
+});
+
+window.addEventListener('mousedown', () => {
+  if (!controls.pointerLocked) {
+    startPointerLock();
+  }
+});
+
+setTimeout(() => {
+  setMessage('Click to start • WASD to move • Space to jump • Mouse to look');
+}, 500);
+
+window.__game = {
+  player,
+  solidBoxes,
+  score,
+  gems,
+  resetPlayer
+};
+
+console.log('Roblox-1o1-Sim ready');
+
+const floor = new THREE.Mesh(
+  new THREE.CircleGeometry(18, 32),
+  new THREE.MeshStandardMaterial({ color: 0x9ae66e, roughness: 0.9 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.position.y = -0.1;
+worldGroup.add(floor);
+
+for (let x = -25; x < 25; x += 5) {
+  for (let z = -25; z < 25; z += 5) {
+    const pad = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 0.5, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0x5ad3c9, roughness: 0.8 })
+    );
+    pad.position.set(x, -0.3, z);
+    worldGroup.add(pad);
+  }
+}
+
+const road = new THREE.Mesh(
+  new THREE.BoxGeometry(6, 0.15, 70),
+  new THREE.MeshStandardMaterial({ color: 0x4b5563, roughness: 0.94 })
+);
+road.position.set(22, -0.06, 0);
+worldGroup.add(road);
+
+const tower = new THREE.Mesh(
+  new THREE.BoxGeometry(5, 10, 5),
+  new THREE.MeshStandardMaterial({ color: 0xeab308, roughness: 0.8 })
+);
+tower.position.set(-28, 5, 20);
+worldGroup.add(tower);
+
+const towerRoof = new THREE.Mesh(
+  new THREE.ConeGeometry(3.5, 4, 4),
+  new THREE.MeshStandardMaterial({ color: 0xf97316 })
+);
+towerRoof.position.set(-28, 12, 20);
+worldGroup.add(towerRoof);
+
+const sign = new THREE.Mesh(
+  new THREE.BoxGeometry(6, 2, 0.4),
+  new THREE.MeshStandardMaterial({ color: 0x111827 })
+);
+sign.position.set(0, 2.2, 22);
+worldGroup.add(sign);
+
+const signText = new THREE.Sprite(
+  new THREE.SpriteMaterial({ color: 0xffffff })
+);
+signText.position.set(0, 2.2, 22.3);
+signText.scale.set(4.8, 1.4, 1);
+worldGroup.add(signText);
+
+const signLabel = document.createElement('canvas');
+const ctx = signLabel.getContext('2d');
+signLabel.width = 256;
+signLabel.height = 64;
+ctx.fillStyle = '#1f2937';
+ctx.fillRect(0, 0, signLabel.width, signLabel.height);
+ctx.fillStyle = '#ffffff';
+ctx.font = 'bold 30px sans-serif';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.fillText('ROBLOX SIM', 128, 32);
+const signTexture = new THREE.CanvasTexture(signLabel);
+signText.material.map = signTexture;
+signText.material.needsUpdate = true;
+
+function buildArena() {
+  const arena = new THREE.Mesh(
+    new THREE.CylinderGeometry(18, 18, 0.6, 32),
+    new THREE.MeshStandardMaterial({ color: 0x91c7ff })
+  );
+arena.position.set(0, -0.5, 0);
+  worldGroup.add(arena);
+}
+
+buildArena();
+
+const clouds = [];
+for (let i = 0; i < 12; i++) {
+  const cloud = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2 + Math.random() * 1.8, 12, 12),
+    new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 })
+  );
+  cloud.position.set(-25 + i * 6, 22 + Math.random() * 10, -20 - Math.random() * 20);
+  cloud.scale.set(1.8, 0.8, 1.1);
+  worldGroup.add(cloud);
+  clouds.push(cloud);
+}
+
+function animateClouds(time) {
+  for (let i = 0; i < clouds.length; i++) {
+    clouds[i].position.x += Math.sin(time * 0.0002 + i) * 0.01;
+  }
+}
+
+const originalAnimate = animate;
+
+function animateLoop(now) {
+  animateClouds(now);
+  originalAnimate(now);
+}
+
+requestAnimationFrame(animateLoop);
+
+const overlay = document.createElement('div');
+overlay.style.position = 'fixed';
+overlay.style.inset = '0';
+overlay.style.background = 'linear-gradient(rgba(0,0,0,0.05), rgba(0,0,0,0.18))';
+overlay.style.pointerEvents = 'none';
+if (!document.body.contains(overlay)) document.body.appendChild(overlay);
+
+const oldAnimateLoop = animateLoop;
+requestAnimationFrame = function (callback) {
+  return setTimeout(() => callback(performance.now()), 16);
+};
+
+console.log('Prototype setup complete');
+
+window.addEventListener('beforeunload', () => {
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame = null;
+  }
+});
+
+const initialText = document.getElementById('message');
+initialText.textContent = 'Click to start • WASD to move • Space to jump • Mouse to look';
