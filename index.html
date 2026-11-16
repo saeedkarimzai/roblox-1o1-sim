@@ -1,28 +1,91 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Roblox-1o1-Sim</title>
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <div id="hud">
-      <div class="top-bar">
-        <div class="chip">Roblox-1o1-Sim</div>
-        <div class="chip">Score: <span id="score">0</span></div>
-        <div class="chip">Gems: <span id="gems">0</span></div>
-      </div>
-
-      <div id="message">
-        Click to start • WASD to move • Space to jump • Mouse to look
-      </div>
-
-      <div id="crosshair" aria-hidden="true">
-        <span></span>
-      </div>
-    </div>
-
-    <script type="module" src="./game.js"></script>
-  </body>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#68c9ff">
+  <title>Blocky Gem Adventure</title>
+  <style>
+    :root{color-scheme:dark;font-family:system-ui,Arial,sans-serif}*{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#79ccff}canvas{display:block;width:100%;height:100%;touch-action:none}#hud{position:fixed;inset:0;pointer-events:none;color:white;text-shadow:0 2px 4px #18304a}#top{position:absolute;top:14px;left:14px;display:flex;gap:8px;flex-wrap:wrap}.pill{padding:9px 13px;border:1px solid #ffffff50;border-radius:20px;background:#142b49bb;font-weight:750;font-size:14px}#hint{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);width:max-content;max-width:92vw;text-align:center;padding:10px 14px;border-radius:12px;background:#142b49bb;font-size:13px}#touch{position:absolute;bottom:75px;left:14px;display:none;pointer-events:auto;gap:5px}.touchrow{display:flex;justify-content:center;gap:5px}.touchbtn{width:48px;height:44px;border:1px solid #ffffff70;border-radius:12px;background:#142b49aa;color:white;font-size:20px;font-weight:bold;touch-action:none}#jump{position:absolute;bottom:86px;right:18px;width:68px;height:68px;border-radius:50%;font-size:13px;background:#e88a20cc}#message{position:absolute;inset:0;display:grid;place-items:center;background:#10233a65;pointer-events:auto;text-align:center;padding:20px}.card{max-width:430px;border:1px solid #ffffff55;border-radius:20px;background:#142b49ee;padding:26px;box-shadow:0 12px 40px #14334b66}.card h1{margin:0 0 8px;font-size:clamp(25px,6vw,42px)}.card p{line-height:1.55}.start{border:0;border-radius:12px;background:#ffd447;color:#28334a;padding:12px 24px;font-weight:900;font-size:16px;cursor:pointer}@media (pointer:coarse){#touch{display:grid}}
+  </style>
+</head>
+<body>
+  <canvas id="game" aria-label="Blocky Gem Adventure game"></canvas>
+  <div id="hud">
+    <div id="top"><div class="pill">🧱 Blocky Gem Adventure</div><div class="pill">⭐ Score: <span id="score">0</span></div><div class="pill">💎 Gems: <span id="gems">0</span>/8</div></div>
+    <div id="hint">Move: WASD or arrow keys · Jump: Space · Collect all 8 gems</div>
+    <div id="touch"><div class="touchrow"><button class="touchbtn" data-key="w">▲</button></div><div class="touchrow"><button class="touchbtn" data-key="a">◀</button><button class="touchbtn" data-key="s">▼</button><button class="touchbtn" data-key="d">▶</button></div></div>
+    <button id="jump" class="touchbtn" data-key="space">JUMP</button>
+    <div id="message"><div class="card"><h1>Blocky Gem Adventure</h1><p>A tiny offline-friendly blocky world. Explore the platforms and grab all 8 floating gems!</p><p><b>WASD / arrow keys</b> to move · <b>Space</b> to jump</p><button id="start" class="start">PLAY</button></div></div>
+  </div>
+<script>
+(()=>{
+  const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');
+  const scoreEl=document.querySelector('#score'),gemsEl=document.querySelector('#gems'),overlay=document.querySelector('#message');
+  let W=0,H=0,scale=34,keys={},last=0,playing=false,score=0,collected=0;
+  const player={x:0,z:0,y:0,vy:0,ground:0};
+  const platforms=[
+    {x:0,z:0,w:8,d:8,h:0,c:'#4fc46b'},
+    {x:7,z:-2,w:3,d:3,h:1.5,c:'#ff9852'},
+    {x:11,z:-5,w:3,d:3,h:3,c:'#9b78ee'},
+    {x:14,z:-1,w:3,d:3,h:4.5,c:'#ff6680'},
+    {x:10,z:4,w:3,d:3,h:6,c:'#39bcd0'},
+    {x:5,z:6,w:3,d:3,h:4.5,c:'#ffb938'},
+    {x:1,z:9,w:3,d:3,h:3,c:'#6a91ff'},
+    {x:-4,z:11,w:3,d:3,h:4.5,c:'#f36ac6'},
+    {x:-8,z:7,w:3,d:3,h:6,c:'#48c6a5'},
+    {x:-7,z:2,w:3,d:3,h:3,c:'#ff8755'}
+  ];
+  const gems=[{x:7,z:-2,h:3},{x:11,z:-5,h:4.4},{x:14,z:-1,h:5.8},{x:10,z:4,h:7.3},{x:5,z:6,h:5.8},{x:1,z:9,h:4.4},{x:-4,z:11,h:5.8},{x:-8,z:7,h:7.3}].map(g=>({...g,got:false,phase:Math.random()*6}));
+  function resize(){const dpr=Math.min(devicePixelRatio||1,2);W=innerWidth;H=innerHeight;canvas.width=Math.floor(W*dpr);canvas.height=Math.floor(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);scale=Math.max(22,Math.min(42,Math.min(W,H)*.055));}
+  addEventListener('resize',resize);resize();
+  function project(x,y,z){return{x:W/2+(x-z)*scale*.72,y:H*.53+(x+z)*scale*.36-y*scale};}
+  function poly(points,color){ctx.fillStyle=color;ctx.beginPath();points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.closePath();ctx.fill();}
+  function cube(x,z,w,d,h,color){
+    const a=project(x-w/2,0,z-d/2),b=project(x+w/2,0,z-d/2),c=project(x+w/2,0,z+d/2),e=project(x-w/2,0,z+d/2);
+    const A=project(x-w/2,h,z-d/2),B=project(x+w/2,h,z-d/2),C=project(x+w/2,h,z+d/2),E=project(x-w/2,h,z+d/2);
+    poly([A,B,C,E],color);poly([E,C,c,e],shade(color,-28));poly([B,C,c,b],shade(color,-42));
+    poly([A,B,C,E],'rgba(255,255,255,.12)');
+  }
+  function shade(hex,amt){let n=parseInt(hex.slice(1),16),r=Math.max(0,Math.min(255,(n>>16)+amt)),g=Math.max(0,Math.min(255,((n>>8)&255)+amt)),b=Math.max(0,Math.min(255,(n&255)+amt));return`rgb(${r},${g},${b})`;}
+  function drawGem(g,t){if(g.got)return;const p=project(g.x,g.h+Math.sin(t*.003+g.phase)*.12,g.z);const s=scale*.36;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(Math.sin(t*.002+g.phase)*.2);ctx.fillStyle='#ffe34c';ctx.strokeStyle='#fff7b2';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,-s);ctx.lineTo(s*.68,0);ctx.lineTo(0,s);ctx.lineTo(-s*.68,0);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();}
+  function drawPlayer(){const p=project(player.x,player.y+player.ground,player.z),s=scale*.42;ctx.fillStyle='#18324b33';ctx.beginPath();ctx.ellipse(p.x,p.y+scale*.12,s*.9,s*.35,0,0,Math.PI*2);ctx.fill();
+    const bob=player.y>0?0:Math.sin(performance.now()*.012)*1.5;
+    ctx.fillStyle='#2659ac';ctx.fillRect(p.x-s*.43,p.y-s*.1+bob,s*.86,s*1.05);
+    ctx.fillStyle='#ffd2a1';ctx.fillRect(p.x-s*.38,p.y-s*.82+bob,s*.76,s*.72);
+    ctx.fillStyle='#26344d';ctx.fillRect(p.x-s*.48,p.y-s*.9+bob,s*.96,s*.2);
+    ctx.fillStyle='white';ctx.fillRect(p.x-s*.19,p.y-s*.58+bob,s*.12,s*.12);ctx.fillRect(p.x+s*.08,p.y-s*.58+bob,s*.12,s*.12);
+  }
+  function draw(t){ctx.clearRect(0,0,W,H);const sky=ctx.createLinearGradient(0,0,0,H);sky.addColorStop(0,'#68c9ff');sky.addColorStop(1,'#e1f8ff');ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+    // soft clouds
+    ctx.fillStyle='#ffffff88';for(let i=0;i<5;i++){const x=((i*197-t*.008)%(W+180)+W+180)%(W+180)-90,y=H*(.15+(i%3)*.1);ctx.beginPath();ctx.ellipse(x,y,42,14,0,0,Math.PI*2);ctx.ellipse(x+25,y-7,30,18,0,0,Math.PI*2);ctx.fill();}
+    // Main safe island and visible route; draw back to front.
+    const visible=[...platforms].sort((a,b)=>(a.x+a.z)-(b.x+b.z));for(const p of visible)cube(p.x,p.z,p.w,p.d,p.h,p.c);
+    for(const g of gems)drawGem(g,t);drawPlayer();
+    // simple edge vignette
+    const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.25,W/2,H/2,Math.max(W,H)*.75);v.addColorStop(0,'transparent');v.addColorStop(1,'#12304b18');ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+  }
+  function onPlatform(x,z){for(const p of platforms){if(Math.abs(x-p.x)<=p.w/2-.16&&Math.abs(z-p.z)<=p.d/2-.16)return p;}return null;}
+  function reset(){player.x=0;player.z=0;player.y=0;player.vy=0;player.ground=0;}
+  function update(dt,t){let dx=0,dz=0;if(keys.w||keys.arrowup)dz-=1;if(keys.s||keys.arrowdown)dz+=1;if(keys.a||keys.arrowleft)dx-=1;if(keys.d||keys.arrowright)dx+=1;
+    if(dx||dz){const n=Math.hypot(dx,dz);dx/=n;dz/=n;player.x+=dx*dt*5.2;player.z+=dz*dt*5.2;}
+    const prevY=player.y+player.ground;player.vy-=17*dt;player.y+=player.vy*dt;
+    const p=onPlatform(player.x,player.z);const feet=player.y+player.ground;
+    if(p&&player.vy<=0&&feet<=p.h+.16&&prevY>=p.h-.25){player.ground=p.h;player.y=0;player.vy=0;}
+    else if(player.ground>0&&(!p||p.h<player.ground-.2)&&player.y<=0){player.y=0;player.ground=0;}
+    if(player.ground===0&&player.y<0){player.y=0;player.vy=0;}
+    if(keys.space&&player.vy===0){player.vy=8.5;player.y+=.04;}
+    if(player.y+player.ground < -8){reset();}
+    for(const g of gems){if(!g.got&&Math.hypot(player.x-g.x,player.z-g.z)<.8&&Math.abs(player.y+player.ground-g.h)<2){g.got=true;collected++;score+=10;scoreEl.textContent=score;gemsEl.textContent=collected;if(collected===8){overlay.innerHTML='<div class="card"><h1>🏆 You did it!</h1><p>You collected every gem. Nice jumping!</p><button id="again" class="start">PLAY AGAIN</button></div>';overlay.style.display='grid';playing=false;document.querySelector('#again').onclick=restart;}}}
+  }
+  function frame(t){const dt=Math.min((t-last)/1000||.016,.04);last=t;if(playing)update(dt,t);draw(t);requestAnimationFrame(frame);}
+  function restart(){score=0;collected=0;scoreEl.textContent='0';gemsEl.textContent='0';gems.forEach(g=>g.got=false);reset();overlay.style.display='none';playing=true;}
+  document.querySelector('#start').addEventListener('click',()=>{overlay.style.display='none';playing=true;});
+  addEventListener('keydown',e=>{const k=e.key.toLowerCase();if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();keys[k===' '?'space':k]=true;});
+  addEventListener('keyup',e=>{const k=e.key.toLowerCase();keys[k===' '?'space':k]=false;});
+  document.querySelectorAll('[data-key]').forEach(b=>{const key=b.dataset.key;b.addEventListener('pointerdown',e=>{e.preventDefault();keys[key]=true;b.setPointerCapture(e.pointerId);});for(const ev of ['pointerup','pointercancel','lostpointercapture'])b.addEventListener(ev,()=>keys[key]=false);});
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
 </html>

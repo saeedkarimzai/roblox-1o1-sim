@@ -1,36 +1,20 @@
-# Roblox-1o1-Sim
+# Blocky Gem Adventure
 
-A lightweight browser-based Roblox-inspired simulation prototype with:
-- 3D blocky world
-- first-person WASD movement
-- jumping, gravity, and simple collision
-- collectible gems and a score counter
-- bright sandbox-style design
+A small, self-contained blocky platform game inspired by Roblox-style worlds. It uses no external libraries, images, or internet connection, so the game can be copied to a USB drive and opened in a browser.
 
-## Run it locally
+## Play on a Chromebook or from a USB drive
 
-Because this project uses browser modules, the easiest way is to serve the folder with a local static server.
+1. In this repository, open `index.html`.
+2. Click **Download raw file** (or open the file's Raw view and use the browser's download option).
+3. Save `index.html` onto your USB drive. You can rename it, for example, to `blocky-gem-adventure.html`.
+4. Open the file from the USB drive with Chrome. If Chrome shows a download warning, choose to keep the HTML file only if you trust this repository.
 
-### Option 1: Python
-
-```bash
-cd roblox-1o1-sim
-python3 -m http.server 8000
-```
-
-Then open `http://localhost:8000` in your browser.
-
-### Option 2: VS Code Live Server
-
-Open the folder in VS Code and run a static file server extension like Live Server.
+You can also use GitHub Pages to play online. For the USB/offline copy, `index.html` is all you need.
 
 ## Controls
 
-- `W A S D` — move
+- `W A S D` or arrow keys — move
 - `Space` — jump
-- `Mouse` — look around
-- `Click` — lock pointer / start game
+- On touchscreens, use the on-screen arrows and Jump button
 
-## Notes
-
-This is a playable prototype inspired by Roblox-style sandbox gameplay, not a full Roblox clone. It is designed to be easy to run and extend.
+Collect all eight gems. The game saves no data and works without internet once the HTML file is downloaded.
