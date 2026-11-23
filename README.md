@@ -1,20 +1,29 @@
 # Blocky Gem Adventure
 
-A small, self-contained blocky platform game inspired by Roblox-style worlds. It uses no external libraries, images, or internet connection, so the game can be copied to a USB drive and opened in a browser.
+A browser game collection with two playable modes. No build step or API key is required.
 
-## Play on a Chromebook or from a USB drive
+## Play
 
-1. In this repository, open `index.html`.
-2. Click **Download raw file** (or open the file's Raw view and use the browser's download option).
-3. Save `index.html` onto your USB drive. You can rename it, for example, to `blocky-gem-adventure.html`.
-4. Open the file from the USB drive with Chrome. If Chrome shows a download warning, choose to keep the HTML file only if you trust this repository.
+- `index.html` — 2D isometric-style blocky gem platform game with keyboard and touch controls.
+- `3d.html` — first-person 3D blocky world with platforms, solid-block collision, collectible gems, mouse look, and a score counter.
 
-You can also use GitHub Pages to play online. For the USB/offline copy, `index.html` is all you need.
+## 2D controls
 
-## Controls
+- WASD or arrow keys — move.
+- Space — jump.
+- On touch screens, use the on-screen direction and jump buttons.
 
-- `W A S D` or arrow keys — move
-- `Space` — jump
-- On touchscreens, use the on-screen arrows and Jump button
+## 3D controls
 
-Collect all eight gems. The game saves no data and works without internet once the HTML file is downloaded.
+- Click the 3D world — capture the mouse.
+- W/A/S/D — move.
+- Space — jump.
+- Mouse — look around.
+- R — reset your position.
+- Escape — release the mouse.
+
+## Run locally or publish
+
+Open `index.html` in a modern browser, or publish the repository with GitHub Pages (Settings → Pages → Deploy from a branch → main → /(root)). The 3D mode imports Three.js from jsDelivr, so it needs an internet connection on first load.
+
+This is an independent browser game, not connected to Roblox accounts or Roblox servers.
